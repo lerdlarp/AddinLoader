@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Tests for the Revit-independent reload engine (shadow copy + assembly renaming).
+    They run on any OS: dotnet test tests/AddinLoader.Tests
+  -->
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <Nullable>disable</Nullable>
+    <LangVersion>latest</LangVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\..\src\AddinLoader\Core\Log.cs" Link="Engine\Log.cs" />
+    <Compile Include="..\..\src\AddinLoader\Core\AssemblyRewriter.cs" Link="Engine\AssemblyRewriter.cs" />
+    <Compile Include="..\..\src\AddinLoader\Core\HostAssemblies.cs" Link="Engine\HostAssemblies.cs" />
+    <Compile Include="..\..\src\AddinLoader\Core\ShadowLoader.cs" Link="Engine\ShadowLoader.cs" />
+    <Compile Include="..\..\src\AddinLoader\Core\AddinManifest.cs" Link="Engine\AddinManifest.cs" />
+    <Compile Include="..\..\src\AddinLoader\Core\ProjectTemplate.cs" Link="Engine\ProjectTemplate.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <PackageReference Include="xunit" Version="2.9.2" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="2.8.2" PrivateAssets="all" />
+    <PackageReference Include="Mono.Cecil" Version="0.11.6" />
+  </ItemGroup>
+
+</Project>
