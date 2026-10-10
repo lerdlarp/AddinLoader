@@ -18,6 +18,8 @@ namespace AddinLoader.Core
     {
         static readonly TimeSpan BuildQuietTime = TimeSpan.FromMilliseconds(1500);
         static readonly List<AddinEntry> entries = new List<AddinEntry>();
+        static readonly List<AddinEntry> pendingReloads = new List<AddinEntry>();
+        static ExternalEvent reloadEvent;
 
         public static UIControlledApplication Application { get; private set; }
         public static string RevitVersion { get; private set; }
@@ -32,6 +34,7 @@ namespace AddinLoader.Core
             Application = application;
             RevitVersion = application.ControlledApplication.VersionNumber;
             Settings = LoaderSettings.Load(RevitVersion);
+            reloadEvent = ExternalEvent.Create(new ReloadHandler());
 
             try { ShadowLoader.CleanUp(LoaderSettings.ShadowRoot); }
             catch (Exception ex) { Log.Error("Shadow folder clean-up failed.", ex); }
@@ -52,6 +55,9 @@ namespace AddinLoader.Core
         {
             if (Application != null)
                 Application.Idling -= OnIdling;
+            reloadEvent?.Dispose();
+            reloadEvent = null;
+            pendingReloads.Clear();
             foreach (var entry in entries)
             {
                 StopApplications(entry);
@@ -266,7 +272,7 @@ namespace AddinLoader.Core
             Settings.Save(RevitVersion);
         }
 
-        /// <summary>Picks up new builds when Revit is idle (in API context).</summary>
+        /// <summary>Detects completed builds; lifecycle callbacks run later in an ExternalEvent.</summary>
         static void OnIdling(object sender, IdlingEventArgs e)
         {
             foreach (var entry in entries.ToList())
@@ -275,8 +281,27 @@ namespace AddinLoader.Core
                     continue;
                 if (!entry.IsBuilt || (entry.IsLoaded && !entry.IsStale))
                     continue;
-                Log.Info($"New build of {entry.Name} detected, reloading...");
-                TryLoad(entry);
+                if (!pendingReloads.Contains(entry))
+                {
+                    Log.Info($"New build of {entry.Name} detected, scheduling reload...");
+                    pendingReloads.Add(entry);
+                }
+            }
+            if (pendingReloads.Count > 0)
+                reloadEvent.Raise();
+        }
+
+        sealed class ReloadHandler : IExternalEventHandler
+        {
+            public string GetName() => "AddinLoader automatic reload";
+
+            public void Execute(UIApplication application)
+            {
+                var pending = pendingReloads.ToList();
+                pendingReloads.Clear();
+                foreach (var entry in pending)
+                    if (Settings.AutoReload && entries.Contains(entry) && entry.IsBuilt && (!entry.IsLoaded || entry.IsStale))
+                        TryLoad(entry);
             }
         }
 

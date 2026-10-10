@@ -39,6 +39,12 @@ namespace AddinLoader.Commands
     {
         public Result Execute(ExternalCommandData commandData, ref string message, ElementSet elements)
         {
+            // Revit registers panes at startup but creates them when the first document opens.
+            if (!DockablePane.PaneExists(ConsolePaneProvider.PaneId))
+            {
+                TaskDialog.Show("AddinLoader Console", "Open a Revit document to show the dockable console. Startup output is retained and will appear when the pane opens.");
+                return Result.Cancelled;
+            }
             var pane = commandData.Application.GetDockablePane(ConsolePaneProvider.PaneId);
             if (pane.IsShown())
                 pane.Hide();

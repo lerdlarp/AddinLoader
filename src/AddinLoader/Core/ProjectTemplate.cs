@@ -19,7 +19,7 @@ namespace AddinLoader.Core
             Directory.CreateDirectory(directory);
 
             var year = int.TryParse(revitVersion, out var v) ? v : 2024;
-            var framework = year >= 2025 ? "net8.0-windows" : "net48";
+            var framework = year >= 2027 ? "net10.0-windows7.0" : year >= 2025 ? "net8.0-windows" : "net48";
 
             Write(Path.Combine(directory, name + ".csproj"), Csproj(framework, year));
             Write(Path.Combine(directory, "Command.cs"), CommandSource(name));

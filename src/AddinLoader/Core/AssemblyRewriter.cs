@@ -46,7 +46,7 @@ namespace AddinLoader.Core
 
         static string RewriteCore(string sourceFile, string outputDirectory, Dictionary<string, string> renames, bool withSymbols)
         {
-            using (var resolver = new DefaultAssemblyResolver())
+            using (var resolver = new RenamedAssemblyResolver(renames))
             {
                 resolver.AddSearchDirectory(Path.GetDirectoryName(sourceFile));
                 var readerParameters = new ReaderParameters
@@ -70,7 +70,6 @@ namespace AddinLoader.Core
                         assembly.Name.Name = newName;
                         RemoveStrongName(assembly);
                         module.Name = newName + extension;
-                        DuplicateWpfResources(module, oldName, newName);
                     }
 
                     foreach (var reference in module.AssemblyReferences)
@@ -84,6 +83,7 @@ namespace AddinLoader.Core
 
                     PatchInternalsVisibleTo(assembly, renames);
                     PatchStrings(module, renames);
+                    PatchWpfResources(module, oldName, newName, renames);
 
                     var output = Path.Combine(outputDirectory, newName + extension);
                     assembly.Write(output, new WriterParameters { WriteSymbols = withSymbols && module.HasSymbols });
@@ -100,17 +100,43 @@ namespace AddinLoader.Core
             assembly.MainModule.Attributes &= ~ModuleAttributes.StrongNameSigned;
         }
 
+        // Cecil resolves enum parameter defaults while writing metadata. A referenced project
+        // may not have been rewritten yet, so resolve its generation name against the source DLL.
+        sealed class RenamedAssemblyResolver : DefaultAssemblyResolver
+        {
+            readonly Dictionary<string, string> originals;
+
+            public RenamedAssemblyResolver(Dictionary<string, string> renames)
+            {
+                originals = renames.ToDictionary(pair => pair.Value, pair => pair.Key, StringComparer.OrdinalIgnoreCase);
+            }
+
+            public override AssemblyDefinition Resolve(AssemblyNameReference name, ReaderParameters parameters)
+            {
+                if (originals.TryGetValue(name.Name, out var original))
+                    name = new AssemblyNameReference(original, name.Version) { Culture = name.Culture };
+                return base.Resolve(name, parameters);
+            }
+        }
+
         /// <summary>
         /// WPF looks up XAML/BAML in "&lt;AssemblyName&gt;.g.resources". Keep the old resource
         /// and add a copy under the new name, whichever name WPF asks for.
         /// </summary>
-        static void DuplicateWpfResources(ModuleDefinition module, string oldName, string newName)
+        static void PatchWpfResources(ModuleDefinition module, string oldName, string newName, Dictionary<string, string> renames)
         {
             var wpfResource = oldName + ".g.resources";
             foreach (var resource in module.Resources.OfType<EmbeddedResource>().ToList())
             {
-                if (string.Equals(resource.Name, wpfResource, StringComparison.OrdinalIgnoreCase))
-                    module.Resources.Add(new EmbeddedResource(newName + ".g.resources", resource.Attributes, resource.GetResourceData()));
+                if (resource.Name.EndsWith(".g.resources", StringComparison.OrdinalIgnoreCase))
+                {
+                    var data = BamlRewriter.RewriteResources(resource.GetResourceData(), renames);
+                    var index = module.Resources.IndexOf(resource);
+                    module.Resources[index] = new EmbeddedResource(resource.Name, resource.Attributes, data);
+                    if (!string.Equals(oldName, newName, StringComparison.Ordinal)
+                        && string.Equals(resource.Name, wpfResource, StringComparison.OrdinalIgnoreCase))
+                        module.Resources.Add(new EmbeddedResource(newName + ".g.resources", resource.Attributes, data));
+                }
             }
         }
 
@@ -160,12 +186,16 @@ namespace AddinLoader.Core
         {
             readonly Regex packUri;
             readonly Regex qualifiedType;
+            readonly Regex xmlNamespace;
+            readonly string resourceNamespace;
             readonly string newName;
 
             public StringRule(string oldName, string newName)
             {
                 this.newName = newName;
+                resourceNamespace = oldName + ";";
                 var name = Regex.Escape(oldName);
+                xmlNamespace = new Regex(@"(?<=;assembly=)" + name + @"(?=$|;)", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
                 // "/MyAddin;component/View.xaml", "pack://application:,,,/MyAddin;v1.0.0.0;component/..."
                 packUri = new Regex(@"(?<=^|[/\\])" + name + @"(?=;(v[0-9.]+;)?([0-9a-fA-F]{16};)?component([/\\]|$))",
                     RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
@@ -177,6 +207,12 @@ namespace AddinLoader.Core
 
             public string Apply(string value)
             {
+                // Theme managers use this assembly prefix to find an existing pack dictionary.
+                // It must follow the same generation as the dictionary's rewritten URI.
+                if (string.Equals(value, resourceNamespace, StringComparison.OrdinalIgnoreCase))
+                    return newName + ";";
+                if (value.StartsWith("clr-namespace:", StringComparison.Ordinal))
+                    value = xmlNamespace.Replace(value, newName);
                 if (value.IndexOf(";component", StringComparison.OrdinalIgnoreCase) >= 0)
                     value = packUri.Replace(value, newName);
                 if (value.IndexOf(',') >= 0)

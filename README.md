@@ -8,7 +8,7 @@ workflow plus automatic reload of `IExternalApplication` ribbons.
 
 ## Features
 
-After installation the **AddinLoader** tab contains the **AddinLoader** pulldown:
+After installation the default **Add-Ins** tab contains the **AddinLoader** panel and pulldown:
 
 | Command | What it does |
 |---|---|
@@ -26,14 +26,15 @@ After installation the **AddinLoader** tab contains the **AddinLoader** pulldown
 * **Remembered.** The list of add-ins is saved per Revit version and loaded again when Revit starts.
 * **Debugging works.** `.pdb` files are rewritten with the assemblies, so breakpoints hit when Visual Studio
   is attached to `Revit.exe`.
-* Revit **2019 – 2024** (.NET Framework 4.8) and **2025 – 2026+** (.NET 8).
+* Revit **2020 – 2024** (.NET Framework 4.8), **2025 – 2026** (.NET 8), and **2027** (.NET 10).
 
 ## Install
 
-Requires the [.NET 8 SDK](https://dotnet.microsoft.com/download). In PowerShell:
+Requires the [.NET 10 SDK](https://dotnet.microsoft.com/download) to build all supported versions. In PowerShell:
 
 ```powershell
 .\install.ps1 -RevitVersion 2024            # or several: -RevitVersion 2023,2024,2025
+.\install.ps1 -RevitVersion (2020..2027)    # all supported versions
 .\install.ps1 -RevitVersion 2024 -Uninstall
 ```
 
@@ -42,6 +43,9 @@ This builds `src/AddinLoader` for each version and copies it to
 Pre-built binaries are also produced by CI as artifacts named `AddinLoader-Revit<version>`.
 
 ## Daily workflow with our main Revit app
+
+For this machine's configured Visual deployment, follow [Switch Visual between native loading and
+AddinLoader](docs/visual-loading-modes.md). It lists the exact manifest names and restart steps.
 
 1. **Disable the deployed copy of the app** while developing (rename its `.addin` file in
    `%AppData%\Autodesk\Revit\Addins\<version>` or `%ProgramData%\Autodesk\Revit\Addins\<version>`).
@@ -80,6 +84,7 @@ returns the old one. AddinLoader handles this as follows:
    * assembly references between the add-in's assemblies,
    * `InternalsVisibleTo`,
    * WPF pack URIs in code (`/OurApp;component/View.xaml`),
+   * assembly prefixes used to locate WPF dictionaries during theme changes (`OurApp;`),
    * assembly-qualified type names,
    * the WPF `OurApp.g.resources` resource.
 

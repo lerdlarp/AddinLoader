@@ -61,6 +61,9 @@ namespace AddinLoader.Tests
         [InlineData("/MyAddinExtra;component/a.xaml", "/MyAddinExtra;component/a.xaml")]
         [InlineData("/OtherMyAddin;component/a.xaml", "/OtherMyAddin;component/a.xaml")]
         [InlineData("MyAddin", "MyAddin")]
+        [InlineData("myaddin;", "MyAddin.r2;")]
+        [InlineData("MyAddinExtra;", "MyAddinExtra;")]
+        [InlineData("Hello, MyAddin;", "Hello, MyAddin;")]
         [InlineData("Hello, MyAddin users", "Hello, MyAddin users")]
         public void PatchString_only_touches_assembly_references(string input, string expected)
         {
@@ -77,6 +80,8 @@ namespace AddinLoader.Tests
             Assert.Equal("main-v1", Call(first.Assembly, "Beta.Probe", "Value"));
             Assert.Equal("lib-v1", Call(first.Assembly, "Beta.Probe", "LibValue"));
             Assert.Equal($"/Beta.r{first.Generation};component/view.xaml", Call(first.Assembly, "Beta.Probe", "Uri"));
+            Assert.True(Call(first.Assembly, "Beta.Probe", "Uri").Contains(
+                Call(first.Assembly, "Beta.Probe", "ResourceNamespace"), StringComparison.OrdinalIgnoreCase));
 
             // "Visual Studio" overwrites the build output while the first build is loaded.
             TestAssemblies.Build(Build, "Beta", "BetaLib", 2);
@@ -85,6 +90,10 @@ namespace AddinLoader.Tests
             Assert.NotSame(first.Assembly, second.Assembly);
             Assert.Equal("main-v2", Call(second.Assembly, "Beta.Probe", "Value"));
             Assert.Equal("lib-v2", Call(second.Assembly, "Beta.Probe", "LibValue"));
+            Assert.True(Call(second.Assembly, "Beta.Probe", "Uri").Contains(
+                Call(second.Assembly, "Beta.Probe", "ResourceNamespace"), StringComparison.OrdinalIgnoreCase));
+            Assert.False(Call(second.Assembly, "Beta.Probe", "Uri").Contains(
+                Call(first.Assembly, "Beta.Probe", "ResourceNamespace"), StringComparison.OrdinalIgnoreCase));
             Assert.Equal("main-v1", Call(first.Assembly, "Beta.Probe", "Value"));
             Assert.Equal("lib-v1", Call(first.Assembly, "Beta.Probe", "LibValue"));
             Assert.StartsWith(Shadow, second.Assembly.Location);
@@ -125,6 +134,7 @@ namespace AddinLoader.Tests
         [Theory]
         [InlineData("2024", "net48")]
         [InlineData("2026", "net8.0-windows")]
+        [InlineData("2027", "net10.0-windows7.0")]
         public void Create_writes_a_project_for_the_running_revit_version(string revitVersion, string framework)
         {
             var project = Path.Combine(root, "My Tool", "My Tool.csproj");

@@ -10,16 +10,16 @@ namespace AddinLoader
 {
     /// <summary>
     /// AddinLoader: load, reload and run Revit add-ins without restarting Revit.
-    /// Adds the "AddinLoader" tab with the AddinLoader pulldown:
+    /// Adds the AddinLoader panel to the default Add-Ins tab with the AddinLoader pulldown:
     /// Application Loader, Application Loader (Faceless), Console (Show/Hide), Reload All.
     /// </summary>
     public class App : IExternalApplication
     {
-        public const string TabName = "AddinLoader";
         public const string PanelName = "AddinLoader";
 
         public Result OnStartup(UIControlledApplication application)
         {
+            Log.StartSession(application.ControlledApplication.VersionNumber);
             ConsoleHub.Install();
             application.RegisterDockablePane(ConsolePaneProvider.PaneId, ConsolePaneProvider.Title, new ConsolePaneProvider());
             CreateRibbon(application);
@@ -44,10 +44,7 @@ namespace AddinLoader
 
         static void CreateRibbon(UIControlledApplication application)
         {
-            try { application.CreateRibbonTab(TabName); }
-            catch (Autodesk.Revit.Exceptions.ArgumentException) { /* tab already exists */ }
-
-            var panel = application.CreateRibbonPanel(TabName, PanelName);
+            var panel = application.CreateRibbonPanel(PanelName);
             var pulldown = (PulldownButton)panel.AddItem(new PulldownButtonData("AddinLoader", "AddinLoader")
             {
                 ToolTip = "Load, reload and run add-ins without restarting Revit.",

@@ -14,6 +14,7 @@
   <ItemGroup>
     <Compile Include="..\..\src\AddinLoader\Core\Log.cs" Link="Engine\Log.cs" />
     <Compile Include="..\..\src\AddinLoader\Core\AssemblyRewriter.cs" Link="Engine\AssemblyRewriter.cs" />
+    <Compile Include="..\..\src\AddinLoader\Core\BamlRewriter.cs" Link="Engine\BamlRewriter.cs" />
     <Compile Include="..\..\src\AddinLoader\Core\HostAssemblies.cs" Link="Engine\HostAssemblies.cs" />
     <Compile Include="..\..\src\AddinLoader\Core\ShadowLoader.cs" Link="Engine\ShadowLoader.cs" />
     <Compile Include="..\..\src\AddinLoader\Core\AddinManifest.cs" Link="Engine\AddinManifest.cs" />
