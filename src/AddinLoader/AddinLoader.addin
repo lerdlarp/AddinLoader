@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RevitAddIns>
+  <AddIn Type="Application">
+    <Name>AddinLoader</Name>
+    <Assembly>AddinLoader\AddinLoader.dll</Assembly>
+    <AddInId>6C4B1C7E-2F0B-4C55-9D3E-8E5A1F2B7A10</AddInId>
+    <FullClassName>AddinLoader.App</FullClassName>
+    <VendorId>AddinLoader</VendorId>
+    <VendorDescription>Load, reload and run Revit add-ins without restarting Revit.</VendorDescription>
+  </AddIn>
+</RevitAddIns>
