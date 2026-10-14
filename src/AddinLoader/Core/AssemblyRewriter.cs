@@ -104,6 +104,7 @@ namespace AddinLoader.Core
         // may not have been rewritten yet, so resolve its generation name against the source DLL.
         sealed class RenamedAssemblyResolver : DefaultAssemblyResolver
         {
+            static bool reportedServicedRuntime;
             readonly Dictionary<string, string> originals;
 
             public RenamedAssemblyResolver(Dictionary<string, string> renames)
@@ -115,8 +116,67 @@ namespace AddinLoader.Core
             {
                 if (originals.TryGetValue(name.Name, out var original))
                     name = new AssemblyNameReference(original, name.Version) { Culture = name.Culture };
-                return base.Resolve(name, parameters);
+                try
+                {
+                    return base.Resolve(name, parameters);
+                }
+                catch (IOException)
+                {
+                    var file = FindServicedFrameworkFile(TrustedPlatformAssemblyPath(name.Name));
+                    if (file == null)
+                        throw;
+                    if (!reportedServicedRuntime)
+                    {
+                        reportedServicedRuntime = true;
+                        Log.Info($"The .NET runtime folder Revit started with is gone (runtime updated?), using {file}. Restart Revit when convenient.");
+                    }
+                    if (parameters.AssemblyResolver == null)
+                        parameters.AssemblyResolver = this;
+                    return ModuleDefinition.ReadModule(file, parameters).Assembly;
+                }
             }
+        }
+
+        /// <summary>
+        /// On .NET (Core) Cecil finds framework assemblies through the host's TRUSTED_PLATFORM_ASSEMBLIES,
+        /// which lists the runtime folder Revit started with. A runtime update installed while Revit runs
+        /// (e.g. 8.0.31 -> 8.0.32) moves that folder away, so Cecil fails with DirectoryNotFoundException.
+        /// </summary>
+        static string TrustedPlatformAssemblyPath(string simpleName)
+        {
+            if (!(AppDomain.CurrentDomain.GetData("TRUSTED_PLATFORM_ASSEMBLIES") is string paths))
+                return null;
+            return paths.Split(Path.PathSeparator).FirstOrDefault(path =>
+                string.Equals(Path.GetFileNameWithoutExtension(path), simpleName, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(Path.GetExtension(path), ".dll", StringComparison.OrdinalIgnoreCase));
+        }
+
+        /// <summary>
+        /// For a missing "...\Microsoft.NETCore.App\8.0.31\System.Runtime.dll", returns the same file
+        /// from the newest installed 8.0.x folder next to it, or null.
+        /// </summary>
+        internal static string FindServicedFrameworkFile(string missingPath)
+        {
+            if (string.IsNullOrEmpty(missingPath) || File.Exists(missingPath))
+                return null;
+            var versionDirectory = Path.GetDirectoryName(missingPath);
+            var frameworkDirectory = Path.GetDirectoryName(versionDirectory);
+            var expected = ParseRuntimeVersion(Path.GetFileName(versionDirectory));
+            if (expected == null || frameworkDirectory == null || !Directory.Exists(frameworkDirectory))
+                return null;
+            var fileName = Path.GetFileName(missingPath);
+            return Directory.GetDirectories(frameworkDirectory)
+                .Select(directory => new { File = Path.Combine(directory, fileName), Version = ParseRuntimeVersion(Path.GetFileName(directory)) })
+                .Where(c => c.Version != null && c.Version.Major == expected.Major && c.Version.Minor == expected.Minor && File.Exists(c.File))
+                .OrderByDescending(c => c.Version)
+                .Select(c => c.File)
+                .FirstOrDefault();
+        }
+
+        static Version ParseRuntimeVersion(string folder)
+        {
+            var dash = folder.IndexOf('-'); // "9.0.0-preview.7.24405.7"
+            return Version.TryParse(dash >= 0 ? folder.Substring(0, dash) : folder, out var version) ? version : null;
         }
 
         /// <summary>
