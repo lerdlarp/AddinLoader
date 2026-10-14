@@ -29,9 +29,9 @@ namespace AddinLoader.UI
         public ApplicationLoaderWindow(IntPtr owner)
         {
             Title = "AddinLoader - Application Loader";
-            Width = 560;
+            Width = 600;
             Height = 520;
-            MinWidth = 420;
+            MinWidth = 540;
             MinHeight = 300;
             WindowStartupLocation = owner == IntPtr.Zero ? WindowStartupLocation.CenterScreen : WindowStartupLocation.CenterOwner;
             ShowInTaskbar = false;
@@ -45,30 +45,41 @@ namespace AddinLoader.UI
             {
                 Content = "Reload automatically after build",
                 IsChecked = AddinLoaderService.Settings.AutoReload,
-                VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(8, 0, 0, 0),
+                Margin = new Thickness(10, 2, 8, 6),
+                HorizontalAlignment = HorizontalAlignment.Left,
                 ToolTip = "Watch the build output folders and reload the add-in (and its ribbon) as soon as Visual Studio writes a new build.",
             };
             autoReload.Checked += (s, e) => AddinLoaderService.SetAutoReload(true);
             autoReload.Unchecked += (s, e) => AddinLoaderService.SetAutoReload(false);
 
-            var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
-            buttons.Children.Add(MakeButton("Create", "Create a new Revit add-in project", OnCreate));
-            buttons.Children.Add(MakeButton("Load", "Load a .dll or .addin file", OnLoad));
-            buttons.Children.Add(executeButton = MakeButton("Execute", "Execute the selected command", OnExecute));
-            buttons.Children.Add(reloadButton = MakeButton("Reload", "Load the newest build of the selected add-in", OnReload));
-            buttons.Children.Add(removeButton = MakeButton("Remove", "Stop and remove the selected add-in", OnRemove));
-            buttons.Children.Add(MakeButton("Close", null, (s, e) => Close()));
+            // Footer: file actions on the left, actions on the selected item and Close on the right.
+            // The auto-reload option sits on its own line so it never overlaps the buttons.
+            var fileButtons = new StackPanel { Orientation = Orientation.Horizontal };
+            fileButtons.Children.Add(MakeButton("Create", "Create a new Revit add-in project", OnCreate, first: true));
+            fileButtons.Children.Add(MakeButton("Load", "Load a .dll or .addin file", OnLoad));
 
-            var bottom = new DockPanel { Margin = new Thickness(0, 4, 8, 8), LastChildFill = false };
-            DockPanel.SetDock(autoReload, Dock.Left);
-            DockPanel.SetDock(buttons, Dock.Right);
-            bottom.Children.Add(autoReload);
-            bottom.Children.Add(buttons);
+            var itemButtons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
+            itemButtons.Children.Add(executeButton = MakeButton("Execute", "Execute the selected command", OnExecute));
+            itemButtons.Children.Add(reloadButton = MakeButton("Reload", "Load the newest build of the selected add-in", OnReload));
+            itemButtons.Children.Add(removeButton = MakeButton("Remove", "Stop and remove the selected add-in", OnRemove));
+            var closeButton = MakeButton("Close", null, (s, e) => Close());
+            closeButton.Margin = new Thickness(12, 0, 0, 0);
+            itemButtons.Children.Add(closeButton);
+
+            var buttons = new Grid { Margin = new Thickness(8, 0, 8, 8) };
+            buttons.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            buttons.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            buttons.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            Grid.SetColumn(fileButtons, 0);
+            Grid.SetColumn(itemButtons, 2);
+            buttons.Children.Add(fileButtons);
+            buttons.Children.Add(itemButtons);
 
             var root = new DockPanel();
-            DockPanel.SetDock(bottom, Dock.Bottom);
-            root.Children.Add(bottom);
+            DockPanel.SetDock(buttons, Dock.Bottom);
+            DockPanel.SetDock(autoReload, Dock.Bottom);
+            root.Children.Add(buttons);
+            root.Children.Add(autoReload);
             root.Children.Add(tabs);
             Content = root;
 
@@ -85,9 +96,9 @@ namespace AddinLoader.UI
             Refresh();
         }
 
-        Button MakeButton(string text, string tooltip, RoutedEventHandler click)
+        Button MakeButton(string text, string tooltip, RoutedEventHandler click, bool first = false)
         {
-            var button = new Button { Content = text, MinWidth = 72, Margin = new Thickness(4, 0, 0, 0), Padding = new Thickness(6, 2, 6, 2), ToolTip = tooltip };
+            var button = new Button { Content = text, MinWidth = 72, Margin = new Thickness(first ? 0 : 4, 0, 0, 0), Padding = new Thickness(8, 3, 8, 3), ToolTip = tooltip };
             button.Click += click;
             return button;
         }
