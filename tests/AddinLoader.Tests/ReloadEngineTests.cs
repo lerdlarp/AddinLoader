@@ -150,5 +150,26 @@ namespace AddinLoader.Tests
             Assert.Contains("IExternalApplication", File.ReadAllText(Path.Combine(directory, "App.cs")));
             Assert.True(File.Exists(Path.Combine(directory, "My_Tool.addin")));
         }
+
+        [Fact]
+        public void Serviced_runtime_files_are_found_in_the_newest_folder_of_the_same_release()
+        {
+            var framework = Path.Combine(root, "dotnet", "shared", "Microsoft.NETCore.App");
+            foreach (var version in new[] { "8.0.30", "8.0.32", "8.0.33", "9.0.0" })
+            {
+                Directory.CreateDirectory(Path.Combine(framework, version));
+                File.WriteAllText(Path.Combine(framework, version, "System.Runtime.dll"), "");
+            }
+            Directory.CreateDirectory(Path.Combine(framework, "8.0.40")); // incomplete install
+
+            // Revit started on 8.0.31, which was removed by an update.
+            var missing = Path.Combine(framework, "8.0.31", "System.Runtime.dll");
+
+            Assert.Equal(Path.Combine(framework, "8.0.33", "System.Runtime.dll"), AssemblyRewriter.FindServicedFrameworkFile(missing));
+            Assert.Null(AssemblyRewriter.FindServicedFrameworkFile(Path.Combine(framework, "8.0.31", "Missing.dll")));
+            Assert.Null(AssemblyRewriter.FindServicedFrameworkFile(Path.Combine(framework, "8.0.30", "System.Runtime.dll"))); // still there
+            Assert.Null(AssemblyRewriter.FindServicedFrameworkFile(Path.Combine(root, "nowhere", "8.0.31", "System.Runtime.dll")));
+            Assert.Null(AssemblyRewriter.FindServicedFrameworkFile(null));
+        }
     }
 }
